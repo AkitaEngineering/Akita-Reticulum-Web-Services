@@ -1,0 +1,2 @@
+# Required Python libraries for Akita Reticulum Web Services
+reticulum>=0.4.0 # Or the specific minimum version you require
