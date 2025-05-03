@@ -34,8 +34,32 @@ Ideal for low-bandwidth, terminal-based, or specialized network environments.
 * **Multi-threaded Request Handling:** Uses threading for concurrent connections.
 
 ## Project Structure
-
-Akita-Reticulum-Web-Services/├── .gitignore├── LICENSE├── README.md├── requirements.txt├── examples/             # Sample HTML files│   ├── index.html│   └── about.html├── scripts/              # Executable scripts│   ├── run_hexagon_server.py│   └── run_phoenix_browser.py└── src/                  # Source code library└── akita_reticulum_web_services/├── init.py├── hexagon_server.py     # Server logic├── html_parser.py        # Browser HTML parser├── phoenix_browser.py    # Browser logic└── plugins/              # Plugin directory├── init.py├── phoenix/          # Browser plugins│   ├── init.py│   └── title_logger.py (Example)└── hexagon/          # Server plugins└── init.py
+```
+Akita-Reticulum-Web-Services/
+├── .gitignore
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── examples/             # Sample HTML files
+│   ├── index.html
+│   └── about.html
+├── scripts/              # Executable scripts
+│   ├── run_hexagon_server.py
+│   └── run_phoenix_browser.py
+└── src/                  # Source code library
+└── akita_reticulum_web_services/
+├── init.py
+├── hexagon_server.py     # Server logic
+├── html_parser.py        # Browser HTML parser
+├── phoenix_browser.py    # Browser logic
+└── plugins/              # Plugin directory
+├── init.py
+├── phoenix/          # Browser plugins
+│   ├── init.py
+│   └── title_logger.py (Example)
+└── hexagon/          # Server plugins
+└── init.py
+```
 ## Installation
 
 1.  **Prerequisites:**
