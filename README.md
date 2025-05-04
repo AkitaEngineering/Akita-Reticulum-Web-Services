@@ -167,15 +167,6 @@ Both the browser and server support simple plugins.
 * **Security:** Basic implementation. No encryption beyond Reticulum's link layer. Be cautious with served content and network exposure.
 * **Link Scope:** Browser currently only follows relative links within the same server destination.
 
-## Future Improvements
-
-* RNS integration for human-readable names.
-* More advanced plugin hooks (e.g., post-parsing hooks for browser).
-* Support for more HTTP methods (POST?) and headers.
-* Asynchronous operations (`asyncio`) for potentially better performance under load.
-* Browser-side caching.
-* Handling different content types more explicitly.
-
 ## Contributing
 
 Contributions are welcome! Please submit pull requests or open issues.
