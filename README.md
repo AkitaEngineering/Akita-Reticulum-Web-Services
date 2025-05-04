@@ -5,8 +5,8 @@
 
 This repository contains two Python applications providing web-like services over the [Reticulum Network Stack](https://reticulum.network/):
 
-* **Akita Phoenix:** A text-based web browser with server discovery, bookmarks, and plugin support.
-* **Akita Hexagon:** A lightweight web server with service announcement, configuration, and plugin support.
+* **Akita Phoenix:** A text-based web browser with discovery, RNS names, bookmarks, configurable caching, POST support, and enhanced plugin hooks.
+* **Akita Hexagon:** A lightweight web server with discovery announcement, enhanced configuration (timeouts, sizes), plugin-based path handling (GET/POST), lifecycle hooks, HTML error pages, and plugin support.
 
 Ideal for low-bandwidth, terminal-based, or specialized network environments.
 
@@ -14,24 +14,32 @@ Ideal for low-bandwidth, terminal-based, or specialized network environments.
 
 ### Akita Phoenix (Browser)
 
-* **Server Discovery:** Automatically discovers running Akita Hexagon servers on the local Reticulum network segment at startup.
-* **Bookmarks:** Save and quickly navigate to favorite Reticulum server paths (`addbm`, `listbm`, `gobm`). Stored in `~/.config/akita-phoenix/bookmarks.json`.
-* **Text-based HTML Rendering:** Extracts and displays the core textual content of HTML pages.
-* **Basic Link Navigation:** Follows relative links within displayed pages.
-* **Navigation Controls:** Supports Back (`b`), Refresh (`r`), and Home (`h`).
-* **Plugin System:** Loads simple plugins from `src/akita_reticulum_web_services/plugins/phoenix/` to extend functionality (e.g., logging page titles).
-* **Robustness:** Improved timeout handling, error reporting, and content decoding.
-* **Command-line Interface:** Connect directly via hash or use discovery.
+* **Server Discovery & RNS:** Connect via discovery, RNS name (e.g., `myweb.serv`), or destination hash.
+* **Bookmarks:** Save (`addbm`), list (`listbm`), navigate (`gobm`) favorite sites. Stored in `~/.config/akita-phoenix/bookmarks.json`.
+* **Configurable Caching:** Time-based response caching in `~/.config/akita-phoenix/cache/`. TTL configurable via `~/.config/akita-phoenix/config.json`. Use `r` to refresh.
+* **Text Rendering:** Displays `text/html`, `text/plain`, and other common text types (`application/json`, `text/css`, etc.). Informs about binary types.
+* **Navigation:** Follow relative links (`[Num]`), Back (`b`), Refresh (`r`), Home (`h`).
+* **POST Requests:** Send simple URL-encoded form data using the `post <path> <key=value&...>` command.
+* **Plugin System:**
+    * `modify_request`: Alter outgoing request (method, path, headers, body).
+    * `process_content`: Modify raw response bytes before parsing.
+    * `post_parse_content`: Modify extracted text/links after parsing.
+    * `modify_links`: Filter or change the list of links before display.
+    * Plugins loaded from `src/akita_reticulum_web_services/plugins/phoenix/`.
 
 ### Akita Hexagon (Server)
 
-* **Service Announcement:** Announces its presence (`akita_web/hexagon`) over Reticulum for discovery.
-* **Configurable:** Settings managed via `~/.config/akita-hexagon/config.json` and command-line overrides (serve directory, interface, log level, identity path).
-* **Plugin System:** Loads plugins from `src/akita_reticulum_web_services/plugins/hexagon/` to modify request handling or responses.
-* **Serves Local Files:** Serves files from a configured directory. Guesses MIME types.
-* **Basic HTTP/1.0 Support:** Handles GET requests.
-* **Error Handling:** Provides basic 4xx and 5xx error responses with logging.
-* **Multi-threaded Request Handling:** Uses threading for concurrent connections.
+* **Service Announcement:** Announces `akita_web/hexagon` for discovery.
+* **Configurable:** Settings via `~/.config/akita-hexagon/config.json` (timeouts, sizes, paths, log level) and command-line overrides.
+* **Plugin System:**
+    * **Path Handling:** Plugins register URL paths (`/myplugin/api`) via `register_path_handler` in `load()`. Requests are routed to `handle_registered_path` (supports GET/POST/etc.).
+    * **Lifecycle Hooks:** `server_startup(config, destination)` and `server_shutdown()` for setup/cleanup (see `startup_logger.py` example).
+    * **Response Hook:** `modify_response` allows altering default responses/errors.
+    * Plugins loaded from `src/akita_reticulum_web_services/plugins/hexagon/`. Includes `echo_post.py` and `startup_logger.py` examples.
+* **File Serving:** Serves local files for GET requests if no plugin handles the path. Uses `mimetypes`.
+* **Basic HTTP/1.0:** Handles GET by default. Handles POST/other methods *only if* a plugin registers a path handler. Requires `Content-Length` for POST/PUT.
+* **Error Handling:** Serves basic HTML error pages (from `src/.../templates/`) for common 4xx/5xx errors. Logs errors.
+* **Multi-threaded Request Handling:** Uses threading for concurrency.
 
 ## Project Structure
 ```
@@ -41,8 +49,6 @@ Akita-Reticulum-Web-Services/
 ├── README.md
 ├── requirements.txt
 ├── examples/             # Sample HTML files
-│   ├── index.html
-│   └── about.html
 ├── scripts/              # Executable scripts
 │   ├── run_hexagon_server.py
 │   └── run_phoenix_browser.py
@@ -52,126 +58,78 @@ Akita-Reticulum-Web-Services/
 ├── hexagon_server.py     # Server logic
 ├── html_parser.py        # Browser HTML parser
 ├── phoenix_browser.py    # Browser logic
+├── templates/            # HTML error page templates
+│   └── error_*.html
 └── plugins/              # Plugin directory
 ├── init.py
 ├── phoenix/          # Browser plugins
 │   ├── init.py
 │   └── title_logger.py (Example)
 └── hexagon/          # Server plugins
-└── init.py
+├── init.py
+├── echo_post.py  (Example)
+└── startup_logger.py (Example)
 ```
 ## Installation
 
-1.  **Prerequisites:**
-    * Python 3.7+
-    * A running and configured Reticulum instance (`rnstatus`, `rnsd`, or integrated). Transport must be active.
+1.  **Prerequisites:** Python 3.7+, running/configured Reticulum instance.
+2.  **Clone:** `git clone <repo_url> && cd Akita-Reticulum-Web-Services`
+3.  **Install deps:** `pip install -r requirements.txt`
 
-2.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/AkitaEngineering/Akita-Reticulum-Web-Services.git](https://github.com/AkitaEngineering/Akita-Reticulum-Web-Services.git)
-    cd Akita-Reticulum-Web-Services
-    ```
+## Configuration
 
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+* **Server (`~/.config/akita-hexagon/config.json`):** Controls serve directory, interface, identity path, log level, timeouts (request/link), size limits (header/POST body). See `load_config` in `hexagon_server.py` for keys and defaults.
+* **Browser (`~/.config/akita-phoenix/config.json`):** Controls cache TTL (`cache_ttl_seconds`), timeouts (request/link/RNS resolve). See `load_browser_config` in `phoenix_browser.py` for keys and defaults.
+
+*(Create these JSON files if you want to override defaults)*
 
 ## Usage
 
 ### 1. Running the Akita Hexagon Server
 
-The server uses a configuration file (`~/.config/akita-hexagon/config.json`) and allows overrides via command-line arguments.
-
-* **Default Configuration (`config.json`):** If the file doesn't exist, defaults will be used. You can create it with content like:
-    ```json
-    {
-        "serve_directory": "./examples",
-        "interface": null, // null lets Reticulum auto-detect
-        "log_level": "INFO",
-        "server_identity_path": "~/.config/akita-hexagon/identity"
-    }
-    ```
-    *(Paths can be relative or absolute; `~` is expanded)*
-
-* **Start the server (using config/defaults):**
-    ```bash
-    python3 scripts/run_hexagon_server.py
-    ```
-
-* **Override configuration via command-line:**
-    ```bash
-    # Use a specific interface and serve from /var/www/reticulum
-    python3 scripts/run_hexagon_server.py -i wlan0 --serve-dir /var/www/reticulum
-
-    # Increase log verbosity
-    python3 scripts/run_hexagon_server.py --log-level DEBUG
-
-    # Use a different config file
-    python3 scripts/run_hexagon_server.py --config /etc/akita-hexagon.json
-    ```
-
-The server will print its configuration and announce hash upon starting.
+* **Start:** `python3 scripts/run_hexagon_server.py`
+* **Overrides:** `python3 scripts/run_hexagon_server.py -c /path/to/config.json -i <iface>`
 
 ### 2. Running the Akita Phoenix Browser
 
-* **Using Server Discovery (Recommended):**
-    ```bash
-    python3 scripts/run_phoenix_browser.py
-    ```
-    It will listen for servers and let you choose.
+* **Discover:** `python3 scripts/run_phoenix_browser.py`
+* **Connect (Name/Hash):** `python3 scripts/run_phoenix_browser.py <target>`
+* **Specify Path:** Add `-p /path/page.html`
 
-* **Connecting Directly:**
-    ```bash
-    python3 scripts/run_phoenix_browser.py <server_destination_hash>
-    ```
-
-* **Connecting to a Specific Path:**
-    ```bash
-    # With discovery
-    python3 scripts/run_phoenix_browser.py -p /about.html
-    # Directly
-    python3 scripts/run_phoenix_browser.py <server_destination_hash> -p /about.html
-    ```
-
-* **Inside the browser:**
-    * Navigate by entering the number next to a link.
-    * **Commands:**
-        * `b`: Go back in history.
-        * `r`: Refresh the current page.
-        * `h`: Go to the root path (`/`) of the current server.
-        * `a [name]` or `addbm [name]`: Add current page as a bookmark. If `name` is omitted, a default name is generated.
-        * `l` or `listbm`: List saved bookmarks.
-        * `g <num>` or `gobm <num>`: Go to the bookmark number shown by `listbm`. (Run `listbm` first if needed).
-        * `q`: Quit the browser.
+* **Browser Commands:**
+    * `[Num]`: Follow link.
+    * `b`: Back.
+    * `r`: Refresh.
+    * `h`: Home (`/`).
+    * `p <path> <data>`: Send POST (e.g., `p /echo name=test&val=123`).
+    * `a [name]`: Add bookmark.
+    * `l`: List bookmarks.
+    * `g <num>`: Go to bookmark.
+    * `q`: Quit.
 
 ## Plugins
 
-Both the browser and server support simple plugins.
-
-* **Browser Plugins:**
-    * Place Python files in `src/akita_reticulum_web_services/plugins/phoenix/`.
-    * Plugins must define a class inheriting from `PhoenixPluginBase`.
-    * Implement the `process_content` method to inspect or modify raw page content before parsing.
-    * See `title_logger.py` for an example.
-* **Server Plugins:**
-    * Place Python files in `src/akita_reticulum_web_services/plugins/hexagon/`.
-    * Plugins must define a class inheriting from `HexagonPluginBase`.
-    * Implement `process_request` to handle requests before file serving (return `True` if handled).
-    * Implement `modify_response` to change status, headers, or body before sending.
+* **Browser:** Place in `src/.../plugins/phoenix/`. Inherit `PhoenixPluginBase`. See base class docstrings for hooks.
+* **Server:** Place in `src/.../plugins/hexagon/`. Inherit `HexagonPluginBase`. Use `load()` to register paths via `self.register_path_handler(...)`. Implement `handle_registered_path(...)` (return `True` if handled). Use lifecycle hooks `server_startup`/`server_shutdown`.
 
 ## Notes
 
-* **Reticulum Setup:** A functional Reticulum transport layer is essential. Ensure `rnstatus` or `rnsd` is running and configured for your network interfaces.
-* **Platform:** Tested on Linux. Should work on macOS/Windows where Python and Reticulum are supported.
-* **Security:** Basic implementation. No encryption beyond Reticulum's link layer. Be cautious with served content and network exposure.
-* **Link Scope:** Browser currently only follows relative links within the same server destination.
+* **Reticulum Setup:** Essential.
+* **POST:** Browser sends URL-encoded. Server relies on plugins registering paths.
+* **Security:** Basic. Use cautiously.
+
+## Future Improvements
+
+* Asynchronous operations (`asyncio`).
+* More robust error pages/handling.
+* More configuration options.
+* More sophisticated plugin management.
+* Support for other HTTP methods via plugins (PUT, DELETE).
 
 ## Contributing
 
-Contributions are welcome! Please submit pull requests or open issues.
+Contributions welcome!
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
+GPLv3 - see [LICENSE](LICENSE) file.
