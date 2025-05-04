@@ -32,15 +32,15 @@ except ImportError as e:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Akita Phoenix - Reticulum Text Browser with optional server discovery.",
+        description="Akita Phoenix - Reticulum Text Browser with RNS name support.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    # Make destination_hash optional
+    # Target can be hash or RNS name, make it optional for discovery
     parser.add_argument(
-        "destination_hash",
-        nargs='?', # Makes the argument optional
+        "target",
+        nargs='?', # Optional positional argument
         default=None, # Default value if not provided
-        help="Optional: Destination hash of the Reticulum web server (Akita Hexagon). If omitted, discovery will be attempted."
+        help="Optional: Destination hash or RNS name (e.g., myweb.service) of the server. If omitted, discovery will be attempted."
     )
     parser.add_argument(
         "-p", "--path",
@@ -56,7 +56,12 @@ def main():
         "--log-level", # Allow explicit log level setting
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         default='INFO', # Default log level if --debug is not used
-        help="Set the logging level."
+        help="Set the logging level (overridden by --debug)."
+    )
+    parser.add_argument(
+        "--config", # Allow specifying browser config file
+        default=None, # Default is ~/.config/akita-phoenix/config.json
+        help="Path to the browser configuration file."
     )
 
 
@@ -78,23 +83,27 @@ def main():
     logging.getLogger("main_script").info(f"Log level set to {log_level_str}")
 
 
-    # Validate destination hash format if provided
-    if args.destination_hash and len(args.destination_hash) != 56:
+    # Validate target format *only if* it looks like a hash but isn't valid hex
+    if args.target and len(args.target) == 56 and not all(c in '0123456789abcdef' for c in args.target.lower()):
          # Use logger instead of print for warnings
-         logging.warning(f"Provided destination hash '{args.destination_hash}' does not look like a valid Reticulum hash (expected 56 hex characters).")
-         # Allow proceeding, Reticulum/run_browser will handle the actual validation/error
+         logging.warning(f"Provided target '{args.target}' looks like a hash but contains invalid characters.")
+         # Allow proceeding, browser logic will try RNS resolution as fallback
 
     # Ensure path starts with a slash
     request_path = args.path
     if not request_path.startswith('/'):
-        logging.info(f"Path '{request_path}' adjusted to start with '/': '/{request_path}'")
+        logging.info(f"Path adjusted to start with '/': '/{request_path}'")
         request_path = '/' + request_path
 
+    # Pass config file path to run_browser if specified
+    # Note: run_browser needs modification to accept this argument
+    # For now, we assume run_browser loads the default config path internally
+    # TODO: Modify run_browser to accept config_path argument if needed later
 
     # Run the browser function from the library
-    # Pass None for hash if it wasn't provided to trigger discovery
+    # Pass None for target if it wasn't provided to trigger discovery
     try:
-        run_browser(initial_destination_hash=args.destination_hash, initial_path=request_path)
+        run_browser(initial_target=args.target, initial_path=request_path)
     except Exception as e:
         # Catch potential crashes in run_browser itself
         logging.critical(f"Browser failed unexpectedly: {e}", exc_info=True)
@@ -103,7 +112,6 @@ def main():
     except KeyboardInterrupt:
          print("\nExiting browser.")
          sys.exit(0)
-
 
 if __name__ == "__main__":
     main()
