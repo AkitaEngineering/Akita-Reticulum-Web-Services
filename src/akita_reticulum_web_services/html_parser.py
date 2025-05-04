@@ -3,6 +3,7 @@
 import html.parser
 import re
 import urllib.parse
+import os # For os.path.normpath
 import logging
 
 # Get logger for this module
@@ -89,32 +90,24 @@ class TextHTMLParser(html.parser.HTMLParser):
         """Handle named character entities like &nbsp;"""
         if not self.ignore_content:
             # Basic handling for common entities
-            if name == 'nbsp':
-                self.text_content.append(' ')
-            elif name == 'lt':
-                self.text_content.append('<')
-            elif name == 'gt':
-                self.text_content.append('>')
-            elif name == 'amp':
-                self.text_content.append('&')
+            if name == 'nbsp': self.text_content.append(' ')
+            elif name == 'lt': self.text_content.append('<')
+            elif name == 'gt': self.text_content.append('>')
+            elif name == 'amp': self.text_content.append('&')
+            elif name == 'quot': self.text_content.append('"')
+            elif name == 'apos': self.text_content.append("'")
             # Add more if needed, or consider using html.unescape if complexity increases
-            else:
-                 # Append the raw entity if unknown
-                 self.text_content.append(f'&{name};')
+            else: self.text_content.append(f'&{name};') # Append the raw entity if unknown
 
     def handle_charref(self, name):
         """Handle numeric character entities like &#160;"""
         if not self.ignore_content:
             try:
                 # Convert numeric entity (decimal or hex) to character
-                if name.startswith(('x', 'X')):
-                    char_code = int(name[1:], 16)
-                else:
-                    char_code = int(name)
+                if name.startswith(('x', 'X')): char_code = int(name[1:], 16)
+                else: char_code = int(name)
                 self.text_content.append(chr(char_code))
-            except ValueError:
-                 # Append the raw entity if conversion fails
-                 self.text_content.append(f'&#{name};')
+            except ValueError: self.text_content.append(f'&#{name};') # Append raw if conversion fails
 
 
     def try_add_link(self, href):
@@ -134,33 +127,30 @@ class TextHTMLParser(html.parser.HTMLParser):
             # Allow relative paths (no scheme, no netloc) or absolute paths (no scheme, no netloc, starts with /)
             if not parsed_url.scheme and not parsed_url.netloc:
                 # Normalize path: join with '/' to handle relative paths correctly, then normalize
-                # Using '/' as base ensures relative paths are treated from root if needed
-                # urljoin handles cases like '../' etc.
                 normalized_path = urllib.parse.urljoin('/', parsed_url.path)
                 # Further normalize to remove redundant slashes or dots
-                normalized_path = os.path.normpath(normalized_path).replace('\\', '/') # Ensure unix-style separators
+                # os.path.normpath might produce backslashes on Windows, replace them
+                normalized_path = os.path.normpath(normalized_path).replace('\\', '/')
 
                 # Ensure path starts with / after normalization
-                if not normalized_path.startswith('/'):
-                    normalized_path = '/' + normalized_path
+                if not normalized_path.startswith('/'): normalized_path = '/' + normalized_path
+
+                # Re-attach query string if present
+                if parsed_url.query: normalized_path += "?" + parsed_url.query
+                # Re-attach fragment if present (though we ignore fragment-only links earlier)
+                # if parsed_url.fragment: normalized_path += "#" + parsed_url.fragment
 
                 if normalized_path not in self.links:
                     self.links.append(normalized_path)
                     logger.debug(f"Added link: {normalized_path} (from href: {href})")
-            else:
-                 # Ignore links with schemes (http, https, ftp) or network locations (domains)
-                 logger.debug(f"Ignoring external or non-relative link: {href}")
+            else: logger.debug(f"Ignoring external or non-relative link: {href}")
 
-        except Exception as e:
-            # Log errors during parsing but don't crash
-            logger.warning(f"Error parsing link href '{href}': {e}")
+        except Exception as e: logger.warning(f"Error parsing link href '{href}': {e}")
 
 
     def get_text(self):
         """Returns the extracted plain text content, cleaned up."""
-        # Join all collected text chunks
         full_text = "".join(self.text_content).strip()
-        # Clean up excessive whitespace and newlines
         full_text = re.sub(r'[ \t]+', ' ', full_text) # Replace multiple spaces/tabs with single space
         full_text = re.sub(r'(\n\s*){2,}', '\n\n', full_text) # Consolidate multiple newlines (max 2)
         return full_text.strip()
@@ -168,35 +158,5 @@ class TextHTMLParser(html.parser.HTMLParser):
 
     def get_links(self):
         """Returns the list of extracted and filtered relative links (paths)."""
-        # Return a copy to prevent external modification
-        return list(self.links)
+        return list(self.links) # Return a copy
 
-# --- Example Usage (for testing) ---
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG) # Enable debug logging for test
-    test_html = """
-    <html><head><title>Test Page</title><style>body { color: blue; }</style></head>
-    <body>
-        <h1>Hello &amp; Welcome</h1><p>This is a test page with &nbsp; spaces.</p>
-        <script>alert('ignored script');</script>
-        <p>Link 1: <a href="/page1.html">Go to Page 1</a></p>
-        <p>Link 2: <a href="page2.html"> Go to Page 2 </a></p>
-        <a href="/page1.html">Another link to Page 1 (should not duplicate)</a>.
-        <p>External link: <a href="http://example.com">Example</a> (ignored)</p>
-        <a href="/tricky/../path/./file.html">Tricky Path</a>
-        <a href="javascript:void(0)">JS Link</a> (ignored)
-        <a href="#section">Fragment Link</a> (ignored)
-        <a href="subdir/page3.html">Subdir Link</a>
-        <a href="../sibling.html">Sibling Link</a>
-        <a href="?query=val">Query Link</a>
-        <div>Block 1</div><div>Block 2</div>
-    </body></html>
-    """
-    parser = TextHTMLParser("dummy_hash") # Base hash doesn't matter for this test
-    parser.feed(test_html)
-    print("--- Extracted Text ---")
-    print(repr(parser.get_text())) # Use repr to see whitespace/newlines clearly
-    print("\n--- Extracted Links ---")
-    print(parser.get_links())
-    # Expected Text (approx): 'Hello & Welcome\n\nThis is a test page with spaces.\n\nLink 1: Go to Page 1 .\n\nLink 2: Go to Page 2 .\n\nAnother link to Page 1 (should not duplicate).\n\nExternal link: Example (ignored)\n\nTricky Path\n\nJS Link (ignored)\n\nFragment Link (ignored)\n\nSubdir Link\n\nSibling Link\n\nQuery Link\n\nBlock 1\n\nBlock 2\n\n'
-    # Expected Links: ['/page1.html', '/page2.html', '/path/file.html', '/subdir/page3.html', '/sibling.html', '/?query=val'] (Order might vary slightly)
