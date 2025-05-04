@@ -8,6 +8,10 @@
         h1 { color: #333; }
         a { color: #0077cc; }
         code { background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
+        .test-form { margin-top: 1.5em; padding: 1em; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9; }
+        .test-form label { display: block; margin-bottom: 0.5em; }
+        .test-form input[type="text"] { margin-bottom: 1em; padding: 0.3em; width: 90%; }
+        .test-form button { padding: 0.5em 1em; background-color: #5cb85c; color: white; border: none; border-radius: 3px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -16,6 +20,18 @@
     <p>It's a very basic example designed to work well with the text-based <strong>Akita Phoenix</strong> browser.</p>
     <p>Check out the <a href="/about.html">About Page</a>.</p>
     <p>Or try an <a href="/nonexistent.html">Invalid Link</a> (should result in a 404).</p>
+
+    <div class="test-form">
+        <h2>Test POST to /echo</h2>
+        <p>(Use Phoenix command: <code>p /echo name=YourName&amp;message=Hello+World</code>)</p>
+        <form action="/echo" method="POST">
+             <label for="name">Name:</label>
+             <input type="text" id="name" name="name" value="Test User"><br>
+             <label for="message">Message:</label>
+             <input type="text" id="message" name="message" value="This is a test."><br>
+             </form>
+    </div>
+
     <hr>
     <p><em>Server running on Reticulum.</em></p>
 </body>
